@@ -7,6 +7,7 @@ from app.models import ruang_video, User
 import jwt
 from functools import wraps
 from pytz import timezone, utc
+from flask_cors import cross_origin
 
 ruang_video_bp = Blueprint("ruangvideo", __name__)
 WITA = timezone("Asia/Makassar")
@@ -41,11 +42,13 @@ def utc_to_wita(dt_utc):
 
 
 # ✅ CREATE
-@ruang_video_bp.route("/", methods=["POST"])
+@ruang_video_bp.route("", methods=["POST"])
+@cross_origin(origin="http://localhost:5173")
 @token_required
 def create_video(current_user):
+    
     try:
-        data = request.form
+        data = request.get_json()
 
         # Ambil data dari form
         judul = data.get("judul")
@@ -84,7 +87,7 @@ def create_video(current_user):
 
 
 # ✅ READ (public)
-@ruang_video_bp.route("/", methods=["GET"])
+@ruang_video_bp.route("", methods=["GET"])
 def get_all_video():
     videos = ruang_video.query.filter_by(deleted_at=None).all()
     results = []
