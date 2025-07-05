@@ -7,9 +7,10 @@ from app.models import karya_seni, User
 import jwt
 from functools import wraps
 from pytz import timezone, utc
+import posixpath
 
 karya_seni_bp = Blueprint("karyaseni", __name__)
-UPLOAD_FOLDER = "static/uploads"
+UPLOAD_FOLDER = os.path.join("static", "uploads")
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
 WITA = timezone("Asia/Makassar")
 
@@ -68,18 +69,20 @@ def create_karya(current_user):
         filepath = os.path.join(UPLOAD_FOLDER, filename)
         foto.save(filepath)
 
+        public_url = posixpath.join("static", "uploads", filename)
+
         new_karya = karya_seni(
             user_id=current_user.id,
             judul_karya=data.get("judul_karya"),
             deskripsi=data.get("deskripsi"),
-            link_foto=filepath,
+            link_foto=public_url,
             link_whatsapp=data.get("link_whatsapp"),
             created_at=datetime.utcnow(),
         )
 
         db.session.add(new_karya)
         db.session.commit()
-        return jsonify({"message": "Karya seni berhasil ditambahkan"}), 201
+        return jsonify({"message": "Karya seni berhasil ditambahkan", "data": new_karya.to_dict()}), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

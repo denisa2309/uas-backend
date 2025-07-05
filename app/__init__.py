@@ -15,6 +15,13 @@ def create_app():
     load_dotenv()  # Load .env file
     app = Flask(__name__)
 
+    base_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))  # satu level di atas app/
+    static_folder_path = os.path.join(base_dir, 'static')
+
+    app = Flask(__name__,
+                static_folder=static_folder_path,
+                static_url_path='/static')
+
     # Load configurations
     app.config.from_object(Config)
     app.config["SECRET_KEY"] = Config.SECRET_KEY  # ✅ Simpan kunci rahasia

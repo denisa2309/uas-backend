@@ -29,6 +29,18 @@ class karya_seni(db.Model):
     updated_at = db.Column(db.DateTime, nullable=True, onupdate=datetime.utcnow)
     deleted_at = db.Column(db.DateTime, nullable=True)
 
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "judul_karya": self.judul_karya,
+            "deskripsi": self.deskripsi,
+            "link_foto": self.link_foto,
+            "link_whatsapp": self.link_whatsapp,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None
+        }
+
 
 class ruang_video(db.Model):
     __tablename__ = "ruang_video"
