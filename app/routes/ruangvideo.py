@@ -3,7 +3,7 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify, current_app
 from werkzeug.utils import secure_filename
 from app import db
-from app.models import ruang_video, User
+from app.models import ruang_video, User, LikeVideo
 import jwt
 from functools import wraps
 from pytz import timezone, utc
@@ -137,4 +137,100 @@ def delete_video(current_user, id):
 
     video.deleted_at = datetime.utcnow()
     db.session.commit()
-    return jsonify({"message": "Video berhasil dihapus (soft delete)"})
+    return jsonify({"message": "Video berhasil dihapus"})
+
+
+@ruang_video_bp.route("/by-user", methods=["GET"])
+def get_video_by_owner():
+
+    username = request.args.get("owner")
+    if not username:
+        return jsonify({"message": "Parameter 'owner' (username) wajib"}), 400
+
+    user = User.query.filter_by(username=username, deleted_at=None).first()
+    if not user:
+        return jsonify({"message": "User tidak ditemukan"}), 404
+
+    video_list = ruang_video.query.filter_by(user_id=user.id, deleted_at=None).all()
+    result = []
+    for video in video_list:
+        result.append(
+            {
+                "id": video.id,
+                "title": video.judul,
+                "description": video.deskripsi,
+                "youtubeLink": video.link_youtube,
+                "thumbnail": (
+                    video.thumbnail_url if hasattr(video, "thumbnail_url") else None
+                ),
+            }
+        )
+    return jsonify(result)
+
+# ✅ HANYA video milik user login
+@ruang_video_bp.route("/me", methods=["GET"])
+@token_required
+def get_my_video(current_user):
+    videos = ruang_video.query.filter_by(user_id=current_user.id, deleted_at=None).all()
+    result = []
+    for v in videos:
+        result.append(
+            {
+                "id": v.id,
+                "title": v.judul,
+                "description": v.deskripsi,
+                "youtubeLink": v.link_youtube,
+                "thumbnail": v.link_thumbnail,
+                "dibuat_oleh": v.dibuat_oleh,
+                "created_at": utc_to_wita(v.created_at),
+                "updated_at": utc_to_wita(v.updated_at),
+            }
+        )
+    return jsonify(result)
+
+
+@ruang_video_bp.route("/<int:id>/like", methods=["POST"])
+@token_required
+def toggle_like_video(current_user, id):
+    video = ruang_video.query.get_or_404(id)
+
+    # Cek apakah user sudah like video ini
+    existing_like = LikeVideo.query.filter_by(user_id=current_user.id, video_id=id).first()
+
+    if existing_like:
+        db.session.delete(existing_like)
+        action = "unliked"
+    else:
+        new_like = LikeVideo(user_id=current_user.id, video_id=id)
+        db.session.add(new_like)
+        action = "liked"
+
+    db.session.commit()
+
+    # Hitung ulang jumlah like
+    like_count = LikeVideo.query.filter_by(video_id=id).count()
+    video.like_count = like_count
+    db.session.commit()
+
+    return jsonify({
+        "message": f"Video berhasil di-{action}",
+        "like_count": video.like_count
+    }), 200
+
+
+# @ruang_video_bp.route("/liked", methods=["GET"])
+# @token_required
+# def get_liked_video_ids(current_user):
+#     liked_ids = [lv.video_id for lv in LikeVideo.query.filter_by(user_id=current_user.id).all()]
+#     return jsonify({"liked_video_ids": liked_ids})
+
+@ruang_video_bp.route("/liked", methods=["GET"])
+@token_required
+def get_liked_video_ids(current_user):
+    try:
+        print("User ID:", current_user.id)
+        liked_ids = [lv.video_id for lv in LikeVideo.query.filter_by(user_id=current_user.id).all()]
+        return jsonify({"liked_video_ids": liked_ids})
+    except Exception as e:
+        print("🔥 ERROR:", e)
+        return jsonify({"error": str(e)}), 500
